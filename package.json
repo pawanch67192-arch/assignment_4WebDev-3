@@ -1,0 +1,28 @@
+{
+  "name": "secure-connect-platform",
+  "version": "1.0.0",
+  "description": "Assignment 4 - Secure Connect and Communication Platform (JWT auth, RBAC, Notes API, Socket.IO chat, EventEmitter)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "jwt",
+    "bcrypt",
+    "socket.io",
+    "express",
+    "rbac",
+    "eventemitter"
+  ],
+  "author": "Pawan Chauhan",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^18.0.10",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.12.1",
+    "socket.io": "^4.8.4"
+  }
+}

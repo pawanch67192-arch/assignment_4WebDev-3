@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Secure Connect - Chat Test Client</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; }
+    fieldset { margin-bottom: 16px; border-radius: 8px; }
+    input, button { padding: 8px; margin: 2px; }
+    #log { height: 280px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px; padding: 8px; background: #fafafa; }
+    .sys { color: #888; font-style: italic; } .me { color: #0a58ca; }
+  </style>
+</head>
+<body>
+  <h2>Secure Connect &ndash; Chat Test Client</h2>
+
+  <fieldset id="authBox">
+    <legend>1. Sign up / Log in</legend>
+    <input id="username" placeholder="username (signup only)" />
+    <input id="email" placeholder="email" />
+    <input id="password" type="password" placeholder="password" />
+    <button id="signupBtn">Sign up</button>
+    <button id="loginBtn">Log in</button>
+    <div id="authMsg"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>2. Chat</legend>
+    <input id="room" value="general" size="12" />
+    <button id="joinBtn" disabled>Join room</button>
+    <div id="log"></div>
+    <input id="msg" placeholder="Type a message..." size="50" disabled />
+    <button id="sendBtn" disabled>Send</button>
+  </fieldset>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let socket = null, myName = '';
+
+    function addLine(text, cls) {
+      const d = document.createElement('div');
+      if (cls) d.className = cls;
+      d.textContent = text;           // textContent (not innerHTML) -> no XSS
+      $('log').appendChild(d);
+      $('log').scrollTop = $('log').scrollHeight;
+    }
+
+    async function api(path, body) {
+      const r = await fetch('/api/auth/' + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      return { ok: r.ok, data: await r.json() };
+    }
+
+    $('signupBtn').onclick = async () => {
+      const { data } = await api('signup', { username: $('username').value, email: $('email').value, password: $('password').value });
+      $('authMsg').textContent = data.message;
+    };
+
+    $('loginBtn').onclick = async () => {
+      const { ok, data } = await api('login', { email: $('email').value, password: $('password').value });
+      $('authMsg').textContent = data.message;
+      if (ok) connect(data.token);
+    };
+
+    function connect(token) {
+      if (socket) socket.disconnect();
+      socket = io({ auth: { token } });
+      socket.on('connect', () => { addLine('Connected as ' + socket.id, 'sys'); ['joinBtn', 'msg', 'sendBtn'].forEach((i) => ($(i).disabled = false)); });
+      socket.on('connect_error', (e) => addLine('Connection error: ' + e.message, 'sys'));
+      socket.on('roomHistory', ({ room, messages }) => { addLine('--- ' + room + ' (last ' + messages.length + ' messages) ---', 'sys'); messages.forEach((m) => addLine(m.username + ': ' + m.text)); });
+      socket.on('chatMessage', (m) => addLine('[' + m.room + '] ' + m.username + ': ' + m.message));
+      socket.on('userJoined', (m) => addLine(m.username + ' joined ' + m.room, 'sys'));
+      socket.on('userLeft', (m) => addLine(m.username + ' left ' + m.room, 'sys'));
+      socket.on('privateMessage', (m) => addLine('(private) ' + m.from + ': ' + m.message, 'me'));
+      socket.on('disconnect', () => addLine('Disconnected', 'sys'));
+    }
+
+    $('joinBtn').onclick = () => socket.emit('joinRoom', $('room').value, (r) => !r.ok && addLine(r.error, 'sys'));
+    const send = () => {
+      if (!$('msg').value.trim()) return;
+      socket.emit('chatMessage', { room: $('room').value, message: $('msg').value }, (r) => !r.ok && addLine(r.error, 'sys'));
+      $('msg').value = '';
+    };
+    $('sendBtn').onclick = send;
+    $('msg').addEventListener('keydown', (e) => e.key === 'Enter' && send());
+  </script>
+</body>
+</html>
